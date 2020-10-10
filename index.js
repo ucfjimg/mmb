@@ -96,6 +96,49 @@ function leaderboardCard(msg, leaders) {
    })
 }
 
+// Create a help card
+//
+function helpCard(msg) {
+   const fields = [
+      { name: 'Overview', value:
+         'MeowMeowBeenz is a social rating app where rate each other on ' +
+         'a scale of 1 to 5. This insidious idea is hidden behind a facade of ' +
+         'brightly colored cats, representing the ratings -- gold, silver, bronze, ' +
+         'yellow, and red, in order of decreasing rank.\n\n' + 
+         'Credit for the idea of MeowMeowBeenz goes to the TV show Community, in which it ' +
+         'basically destroyed civilization.'
+      },
+      { name: 'board', value:
+         'Displays a leaderboard of the people with the top scores on the server. ' +
+         'These people are your betters, and you must (if they ask) wash their cars.'
+      },
+      { name: 'me', value:
+         'Sends a card with your own rating, for you and the world to see.'
+      },
+      { name: 'ping', value:
+         'Tests that the bot server is alive.'
+      },
+      { name: 'rate <mention> 1,2,3,4,5', value: 
+         'Gives a user a rating. Ratings are cumulative, and you can rate someone else ' +
+         'more than once. 5 is good and 1 is bad. Ratings are not anonymous.'
+      },
+      { name: 'tea <mention>', value:
+         'Sends a card with someone else\'s rating, for you and the world to see.'
+      }
+   ]
+
+   return msg.channel.createMessage({
+      embed: { 
+         thumbnail: {
+            url: catUrl(5)
+         },
+         title: 'Help!',
+         fields
+      }
+   })
+
+}
+
 // Determine if the given token is a user snowflake
 //
 function parseUserSnowflake(str) {
@@ -117,6 +160,11 @@ function parseUserSnowflake(str) {
    }
 
    return str;
+}
+
+// the help command
+commandHandlers['help'] = async (msg, args) => {
+   return helpCard(msg)
 }
 
 // the rate command - allows one use to rate another
