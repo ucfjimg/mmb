@@ -7,17 +7,20 @@ const ratings = require('./ratings')
 const bot = new eris.Client(process.env.token)
 
 const PREFIX = 'b!'
+const DEFAULT_RATING_TIMEOUT = 3600
+
+
 const commandHandlers = {};
 
 // Create a message for an error message (including the worst cat)
 //
-function errorCard(msg, error) {
+function errorCard(msg, error, title) {
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
             url: 'http://rodentia.net/mmb1.png'
          },
-         title: 'Whoops!',
+         title: title || 'Whoops!',
          description: `<@${msg.author.id}> did something wrong and will be docked one MeowMeowBeen (not really). ${error}`
       }
    })
@@ -70,7 +73,7 @@ function parseUserSnowflake(str) {
    } else if (str.substr(0, 3) == '<@!') {
       str = str.substr(3);
    } else {
-      return null;
+      return null
    }
 
    return str;
@@ -93,11 +96,29 @@ commandHandlers['rate'] = async (msg, args) => {
    }
 
    const rating = parseInt(args[1])
-   if (args[1].length != 1 || isNaN(rating)) {
+   if (args[1].length != 1 || isNaN(rating) || rating < 1 || rating > 5) {
       return errorCard(msg, "Rating must be a number from 1 to 5.")
    }
 
    console.log(`${rater} wants to rate ${ratee} as ${rating}`)
+
+   const last = await db.getLastRatingTime(rater, ratee);
+   if (last != null) {
+      // difference is in milliseconds, we need seconds
+      const seconds = (new Date() - last) / 1000.0
+      const timeout = process.env.rating_timeout || DEFAULT_RATING_TIMEOUT
+
+      if (seconds <= timeout) {
+         const left = timeout - seconds
+         const leftText = 
+            left >= 120 ?
+               `${Math.floor(left/60)} minutes` :
+               `${Math.floor(left)} seconds`
+
+
+         return errorCard(msg, `You need to wait another ${leftText} before rating <@!${ratee}> again.`, 'Whoa There!')
+      }
+   }
 
    await db.addRating(rater, ratee, rating)
 
@@ -152,7 +173,6 @@ bot.on('messageCreate', async (msg) => {
    if (!msg.channel.guild)
       return
 
-   console.log(msg)
    console.log(`content ${content}`)
    if (!content.startsWith(PREFIX))
       return
