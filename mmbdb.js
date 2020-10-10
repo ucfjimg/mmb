@@ -43,14 +43,14 @@ async function addRating(rater, ratee, rating) {
       console.log("Rating added.");
 
       // Get the ratee's record. It should be present since ensureUser was called earlier.
-      const rateeEntry = await client.query(
-         'SELECT * FROM users WHERE userid=$1', [ratee]
+      const res = await client.query(
+         'SELECT sumrating, numratings FROM users WHERE userid=$1', [ratee]
       )
 
       // Get the rating sum and number of ratings,
       // then modify them in accordance with the new rating.
-      const curSum = parseInt(rateeEntry.rows[0].sumrating);
-      const curNumRatings = parseInt(rateeEntry.rows[0].numratings);
+      const curSum = parseInt(res.rows[0].sumrating);
+      const curNumRatings = parseInt(res.rows[0].numratings);
       await client.query(
          'UPDATE users SET sumrating=$1, numratings=$2',
          [curSum + rating, curNumRatings + 1]
@@ -62,16 +62,23 @@ async function addRating(rater, ratee, rating) {
    }
 }
 
+// getRating - Calculate the user's current rating.
 async function getRating(userid) {
+   // Connect to the DB.
    const client = await pool.connect()
 
    try {
+      // Get the user's ratings info.
       const res = await client.query(
-         'SELECT rating FROM users WHERE userid=$1', [userid]
+         'SELECT sumrating, numratings FROM users WHERE userid=$1', [userid]
       )
+      // If the user is in the DB, calculate the mean and return.
+      // Otherwise, provide the default rating (0).
       if (res.rowCount !== 0) {
          console.log(res.rows[0])
-         return res.rows[0].rating
+         const curSum = parseInt(res.rows[0].sumrating);
+         const curNumRatings = parseInt(res.rows[0].numratings);
+         return curSum / curNumRatings;
       }
       return DEFAULT_RATING
    } catch (e) {
