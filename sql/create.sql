@@ -1,6 +1,7 @@
 CREATE TABLE users (
    userid TEXT PRIMARY KEY,
-   rating NUMERIC
+   sumRating NUMERIC,
+   numRatings NUMERIC
 );
 
 CREATE TABLE ratings (
@@ -14,4 +15,3 @@ CREATE INDEX on ratings(
    userid,
    time DESC
 )
-

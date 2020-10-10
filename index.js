@@ -29,14 +29,17 @@ function errorCard(msg, error, title) {
 // Create a message when a user's rating has changed due to another user
 //
 function ratedCard(msg, rater, ratee, rating) {
-   const png = `http://rodentia.net/mmb${rating}.png`;
+   // Math.round(rating) rounds the rating to the nearest whole number.
+   const png = `http://rodentia.net/mmb${Math.round(rating)}.png`;
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
             url: png
          },
          title: 'Attention!',
-         description: `<@!${rater}> has given <@!${ratee}> a rating of ${rating}. <@!${ratee}>\'s new rating is ${rating}.`
+         // rating.toFixed(2) rounds the value to 2 decimal places.
+         description: `<@!${rater}> has given <@!${ratee}> a rating of ${rating.toFixed(2)}.
+                        <@!${ratee}>\'s new rating is ${rating.toFixed(2)}.`
       }
    })
 }
@@ -119,7 +122,11 @@ commandHandlers['rate'] = async (msg, args) => {
 
    await db.addRating(rater, ratee, rating)
 
-   return ratedCard(msg, rater, ratee, rating)
+   // Wait for the new rating so the card doesn't recieve an object promise.
+   var newRating = await db.getRating(ratee);
+   console.log(`Now the rating is ${newRating}`)
+
+   return ratedCard(msg, rater, ratee, newRating)
 }
 
 commandHandlers['ping'] = async (msg, args) => {
