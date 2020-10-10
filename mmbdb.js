@@ -35,6 +35,7 @@ async function addRating(rater, ratee, rating) {
    const client = await pool.connect()
 
    try {
+      await client.query('BEGIN')
       // Add this rating to the ratings table.
       await client.query(
          'INSERT INTO ratings (userid, rater, rating, time) VALUES ($1, $2, $3, now())',
@@ -55,7 +56,9 @@ async function addRating(rater, ratee, rating) {
          'UPDATE users SET sumrating=$1, numratings=$2',
          [curSum + rating, curNumRatings + 1]
       )
+      await client.query('COMMIT')
    } catch (e) {
+      await client.query('ROLLBACK')
       console.warn(e)
    } finally {
       client.release()
