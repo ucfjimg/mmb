@@ -9,8 +9,20 @@ const bot = new eris.Client(process.env.token)
 const PREFIX = 'b!'
 const DEFAULT_RATING_TIMEOUT = 3600
 
-
 const commandHandlers = {};
+
+// Get the URL for a cat image
+//
+function catUrl(rating) {
+   return `http://rodentia.net/mmb${rating}.png`;
+}
+
+// Format a rating 
+// 
+function formatRating(rating) {
+   // rating.toFixed(2) rounds the value to 2 decimal places.
+   return rating.toFixed(2)
+}
 
 // Create a message for an error message (including the worst cat)
 //
@@ -18,7 +30,7 @@ function errorCard(msg, error, title) {
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
-            url: 'http://rodentia.net/mmb1.png'
+            url: catUrl(1)
          },
          title: title || 'Whoops!',
          description: `<@${msg.author.id}> did something wrong and will be docked one MeowMeowBeen (not really). ${error}`
@@ -28,18 +40,16 @@ function errorCard(msg, error, title) {
 
 // Create a message when a user's rating has changed due to another user
 //
-function ratedCard(msg, rater, ratee, rating) {
-   // Math.round(rating) rounds the rating to the nearest whole number.
-   const png = `http://rodentia.net/mmb${Math.round(rating)}.png`;
+function ratedCard(msg, rater, ratee, given, rating) {
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
-            url: png
+            // Math.round(rating) rounds the rating to the nearest whole number.
+            url: catUrl(Math.round(rating))
          },
          title: 'Attention!',
-         // rating.toFixed(2) rounds the value to 2 decimal places.
-         description: `<@!${rater}> has given <@!${ratee}> a rating of ${rating.toFixed(2)}.
-                        <@!${ratee}>\'s new rating is ${rating.toFixed(2)}.`
+         description: `<@!${rater}> has given <@!${ratee}> a rating of ${given}.
+                        <@!${ratee}>\'s new rating is ${formatRating(rating)}.`
       }
    })
 }
@@ -47,14 +57,41 @@ function ratedCard(msg, rater, ratee, rating) {
 // Create a generic rating card
 //
 function ratingCard(msg, user, rating) {
-   const png = `http://rodentia.net/mmb${rating}.png`;
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
-            url: png
+            // if no rating, use 3 -- neutral
+            url: catUrl(rating === 0 ? 3 : Math.round(rating))
          },
-         title: 'Here\s the tea!',
-         description: `<@!${user}> has a rating of ${rating}.`
+         title: 'Here\'s the tea!',
+         description: 
+            rating === 0 
+               ? `<@!${user}> is not yet rated.`
+               : `<@!${user}> has a rating of ${formatRating(rating)}.`
+      }
+   })
+}
+
+// Create a leaderboard card
+//
+function leaderboardCard(msg, leaders) {
+   // This should really have the proper cat icon by each place, but
+   // fields don't support images other than existing emoji
+   //
+   const fields = leaders.map((leader, n) => { 
+      return { 
+         name: n+1, 
+         value: `<@!${leader.userid}> : ${formatRating(parseFloat(leader.rating))}`  
+      }
+   })
+
+   return msg.channel.createMessage({
+      embed: { 
+         thumbnail: {
+            url: catUrl(5)
+         },
+         title: 'The Purrfect People',
+         fields 
       }
    })
 }
@@ -69,17 +106,22 @@ function parseUserSnowflake(str) {
    str = str.substr(0, str.length-1);
 
    if (str.substr(0, 2) == '<!') {
+      // username 
       str = str.substr(2);
    } else if (str.substr(0, 3) == '<@!') {
+      // nickname
       str = str.substr(3);
    } else {
+      // not a user snowflake
       return null
    }
 
    return str;
 }
 
+// the rate command - allows one use to rate another
 commandHandlers['rate'] = async (msg, args) => {
+   // Verify right # of args
    if (args.length != 2) {
       return errorCard(msg, 'Rate needs a mention and a rating.');
    }
@@ -87,14 +129,17 @@ commandHandlers['rate'] = async (msg, args) => {
    rater = msg.author.id;
    ratee = parseUserSnowflake(args[0]);
 
+   // verify target is a user
    if (ratee == null) {
       return errorCard(msg, 'You need to mention someone to rate.')
    }
 
+   // verify user not trying to up themselves
    if (rater === ratee) {
       return errorCard(msg, 'You can\'t rate yourself!')
    }
 
+   // verify rating is ok
    const rating = parseInt(args[1])
    if (args[1].length != 1 || isNaN(rating) || rating < 1 || rating > 5) {
       return errorCard(msg, "Rating must be a number from 1 to 5.")
@@ -102,6 +147,7 @@ commandHandlers['rate'] = async (msg, args) => {
 
    console.log(`${rater} wants to rate ${ratee} as ${rating}`)
 
+   // enforce rating timeout
    const last = await db.getLastRatingTime(rater, ratee);
    if (last != null) {
       // difference is in milliseconds, we need seconds
@@ -122,18 +168,20 @@ commandHandlers['rate'] = async (msg, args) => {
 
    await db.addRating(rater, ratee, rating)
 
-   // Wait for the new rating so the card doesn't recieve an object promise.
+   // Wait for the new rating so the card doesn't receive an object promise.
    var newRating = await db.getRating(ratee);
    console.log(`Now the rating is ${newRating}`)
 
-   return ratedCard(msg, rater, ratee, newRating)
+   return ratedCard(msg, rater, ratee, rating, newRating)
 }
 
+// Test connectivity to the bot
+//
 commandHandlers['ping'] = async (msg, args) => {
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
-            url: 'http://rodentia.net/mmb5.png'
+            url: catUrl(5)
          },
          title: 'Meow!',
          description: 'I\'m here and paying attention. Are you?'
@@ -141,12 +189,16 @@ commandHandlers['ping'] = async (msg, args) => {
    })
 }
 
+// Give me my stats
+//
 commandHandlers['me'] = async (msg, args) => {
    const myRating = await ratings.getRating(msg.author.id)
 
-   return ratingCard(msg.author.id, myRating)
+   return ratingCard(msg, msg.author.id, myRating)
 }
 
+// Give me someone else's stats
+//
 commandHandlers['tea'] = async (msg, args) => {
    if (args.length != 1) {
       return errorCard(msg, 'Tea requires someone to snoop on.');
@@ -159,24 +211,42 @@ commandHandlers['tea'] = async (msg, args) => {
    }
 
    const teaRating = await ratings.getRating(ratee)
+   console.log(teaRating)
 
-   return msg.channel.createMessage(`Their rating is ${teaRating}`)
+   return ratingCard(msg, ratee, teaRating)
 }
 
+// Return the leaderboard
+//
+commandHandlers['board'] = async (msg, args) => {
+   const leaders = await db.getLeaderboard()
+
+   return leaderboardCard(msg, leaders)
+}
+
+// When the bot comes online
+//
 bot.on('ready', () => {
    console.log('connected and ready')
 })
 
+// When any message is sent
+//
 bot.on('messageCreate', async (msg) => {
    const content = msg.content
 
-   if (!msg.channel.guild)
+   // Ensure the message is a server message
+   if (!msg.channel.guild) {
       return
+   }
 
+   // Ensure the message is targeted at the bot
+   if (!content.startsWith(PREFIX)) {
+      return
+   }
    console.log(`content ${content}`)
-   if (!content.startsWith(PREFIX))
-      return
 
+   // Parse the message and dispatch it
    const parts = content.split(' ').map(s => s.trim()).filter(s => s)
    const commandName = parts[0].substr(PREFIX.length)
    const handler = commandHandlers[commandName]

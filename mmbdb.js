@@ -53,8 +53,8 @@ async function addRating(rater, ratee, rating) {
       const curSum = parseInt(res.rows[0].sumrating);
       const curNumRatings = parseInt(res.rows[0].numratings);
       await client.query(
-         'UPDATE users SET sumrating=$1, numratings=$2',
-         [curSum + rating, curNumRatings + 1]
+         'UPDATE users SET sumrating=$1, numratings=$2 WHERE userid=$3',
+         [curSum + rating, curNumRatings + 1, ratee]
       )
       await client.query('COMMIT')
    } catch (e) {
@@ -81,11 +81,14 @@ async function getRating(userid) {
          console.log(res.rows[0])
          const curSum = parseInt(res.rows[0].sumrating);
          const curNumRatings = parseInt(res.rows[0].numratings);
+         
+         console.log(`getRating ${curSum} / ${curNumRatings} = ${curSum/curNumRatings}`)
          return curSum / curNumRatings;
       }
       return DEFAULT_RATING
    } catch (e) {
       console.warn(e)
+      return DEFAULT_RATING
    } finally {
       client.release()
    }
@@ -104,6 +107,28 @@ async function getLastRatingTime(rater, ratee) {
       return res.rows[0].time
    } catch (e) {
       console.warn(e)
+      return null
+   } finally {
+      client.release()
+   }
+}
+
+async function getLeaderboard() {
+   const client = await pool.connect()
+
+   try {
+      const res = await client.query(
+         'SELECT userid, sumrating, numratings FROM users ORDER BY sumrating / numratings DESC LIMIT 5'
+      )
+      return res.rows.map(row => { return {
+         userid: row.userid,
+         rating: parseInt(row.sumrating) / parseInt(row.numratings)
+      }})
+
+      return res.rows
+   } catch (e) {
+      console.warn(e)
+      return null
    } finally {
       client.release()
    }
@@ -112,4 +137,5 @@ async function getLastRatingTime(rater, ratee) {
 
 exports.addRating = addRating
 exports.getRating = getRating
-exports.getLastRatingTime = getLastRatingTime;
+exports.getLastRatingTime = getLastRatingTime
+exports.getLeaderboard = getLeaderboard
