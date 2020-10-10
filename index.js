@@ -90,7 +90,7 @@ commandHandlers['rate'] = async (msg, args) => {
    }
 
    const rating = parseInt(args[1])
-   if (args[1].length != 1 || isNaN(rating)) {
+   if (args[1].length != 1 || isNaN(rating) || rating < 1 || rating > 5) {
       return errorCard(msg, "Rating must be a number from 1 to 5.")
    }
 
