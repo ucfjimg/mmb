@@ -57,11 +57,30 @@ async function getRating(userid) {
       return DEFAULT_RATING
    } catch (e) {
       console.warn(e)
-      await client.query('ROLLBACK')
    } finally {
       client.release()
    }
 }
 
+async function getLastRatingTime(rater, ratee) {
+   const client = await pool.connect()
+
+   try {
+      const res = await client.query(
+         'SELECT time FROM ratings WHERE rater=$1 AND userid=$2 ORDER BY time DESC LIMIT 1', [rater, ratee]
+      )
+      if (res.rows.length == 0) {
+         return null
+      }
+      return res.rows[0].time
+   } catch (e) {
+      console.warn(e)
+   } finally {
+      client.release()
+   }
+}
+
+
 exports.addRating = addRating
 exports.getRating = getRating
+exports.getLastRatingTime = getLastRatingTime;
