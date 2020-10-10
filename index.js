@@ -7,10 +7,11 @@ const ratings = require('./ratings')
 const bot = new eris.Client(process.env.token)
 
 const PREFIX = 'b!'
+const MIN_RATING_TO_KICK = 1.5
+const MIN_NUMRATINGS_TO_KICK = 10
 const commandHandlers = {};
 
 // Create a message for an error message (including the worst cat)
-//
 function errorCard(msg, error) {
    return msg.channel.createMessage({
       embed: {
@@ -23,9 +24,25 @@ function errorCard(msg, error) {
    })
 }
 
+// Create a message when a user is kicked for a low rating.
+function kickedCard(msg, user, newRating, avgRating, numRatings) {
+   const png = `http://rodentia.net/mmb1.png`;
+   return msg.channel.createMessage({
+      embed: {
+         thumbnail: {
+            url: png
+         },
+         title: `A user has been removed.`,
+         description: `With ${numRatings} ratings, a recent score of ${newRating},
+                       and an average score of ${avgRating.toFixed(2)}, <@!${user}> has been kicked from the server.
+                       Please keep in mind that this is not a ban; they can rejoin if they still have the server link.
+                       However, their score will not be reset if they rejoin.`
+      }
+   })
+}
+
 // Create a message when a user's rating has changed due to another user
-//
-function ratedCard(msg, rater, ratee, rating) {
+function ratedCard(msg, rater, ratee, rating, avgRating) {
    // Math.round(rating) rounds the rating to the nearest whole number.
    const png = `http://rodentia.net/mmb${Math.round(rating)}.png`;
    return msg.channel.createMessage({
@@ -35,14 +52,13 @@ function ratedCard(msg, rater, ratee, rating) {
          },
          title: 'Attention!',
          // rating.toFixed(2) rounds the value to 2 decimal places.
-         description: `<@!${rater}> has given <@!${ratee}> a rating of ${rating.toFixed(2)}.
-                        <@!${ratee}>\'s new rating is ${rating.toFixed(2)}.`
+         description: `<@!${rater}> has given <@!${ratee}> a rating of ${rating}.
+                        <@!${ratee}>\'s new rating is ${avgRating.toFixed(2)}.`
       }
    })
 }
 
 // Create a generic rating card
-//
 function ratingCard(msg, user, rating) {
    const png = `http://rodentia.net/mmb${rating}.png`;
    return msg.channel.createMessage({
@@ -101,11 +117,24 @@ commandHandlers['rate'] = async (msg, args) => {
 
    await db.addRating(rater, ratee, rating)
 
-   // Wait for the new rating so the card doesn't recieve an object promise.
-   var newRating = await db.getRating(ratee);
-   console.log(`Now the rating is ${newRating}`)
+   // Wait for the average rating so the card doesn't recieve an object promise.
+   const avgRating = await db.getRating(ratee);
+   console.log(`Now the rating is ${avgRating}`);
 
-   return ratedCard(msg, rater, ratee, newRating)
+   // If the new rating and average rating are too low, check the number of ratings.
+   // If there are enough ratings, kick the user.
+   if(rating < MIN_RATING_TO_KICK && avgRating < MIN_RATING_TO_KICK)
+   {
+      const numRatings = await db.getNumRatings(ratee);
+      if(numRatings >= MIN_NUMRATINGS_TO_KICK)
+      {
+         // Kick the member associated with the user ID.
+         msg.channel.guild.kickMember(ratee, 'Score was below threshold.');
+         return kickedCard(msg, ratee, rating, avgRating, numRatings);
+      }
+   }
+
+   return ratedCard(msg, rater, ratee, rating, avgRating)
 }
 
 commandHandlers['ping'] = async (msg, args) => {
@@ -152,8 +181,8 @@ bot.on('messageCreate', async (msg) => {
    if (!msg.channel.guild)
       return
 
-   console.log(msg)
-   console.log(`content ${content}`)
+   //console.log(msg)
+   //console.log(`content ${content}`)
    if (!content.startsWith(PREFIX))
       return
 
