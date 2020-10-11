@@ -52,8 +52,8 @@ async function addRating(rater, ratee, rating) {
       const curSum = parseInt(res.rows[0].sumrating);
       const curNumRatings = parseInt(res.rows[0].numratings);
       await client.query(
-         'UPDATE users SET sumrating=$1, numratings=$2',
-         [curSum + rating, curNumRatings + 1]
+         'UPDATE users SET sumrating=$1, numratings=$2 WHERE userid=$3',
+         [curSum + rating, curNumRatings + 1, ratee]
       )
    } catch (e) {
       console.warn(e)
