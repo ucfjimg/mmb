@@ -1,0 +1,19 @@
+#!/bin/bash
+if [ -z $1 ] ; then
+   echo 'Need guild id of server to add emojis'
+   exit 1
+fi
+
+GUILD=$1
+URL=https://discord.com/api/guilds/${GUILD}/emojis
+TOKEN=$(grep ^token= .env)
+TOKEN=${TOKEN/token=/}
+
+i=0
+while [ $i -le 5 ] ; do
+   DATA=$(base64 -w 0 < ./images/mmb/64/mmb${i}.png)
+   JSON="{\"name\":\"cat${i}\",\"roles\":[\"${GUILD}\"],\"image\":\"data:image/png;base64,${DATA}\"}"
+   curl -v -H "Authorization: Bot ${TOKEN}" -H "Content-Type: application/json" -X POST ${URL} -d "${JSON}"
+   i=$(($i+1))
+done
+
