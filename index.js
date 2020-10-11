@@ -42,7 +42,7 @@ function errorCard(msg, error, title) {
 
 // Create a message when a user is kicked for a low rating.
 function kickedCard(msg, user, newRating, avgRating, numRatings) {
-   const png = `http://rodentia.net/mmb1.png`;
+   const png = `http://rodentia.net/mmb0.png`;
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
