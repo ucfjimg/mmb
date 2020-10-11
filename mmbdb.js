@@ -35,6 +35,7 @@ async function addRating(rater, ratee, rating) {
    const client = await pool.connect()
 
    try {
+      await client.query('BEGIN')
       // Add this rating to the ratings table.
       await client.query(
          'INSERT INTO ratings (userid, rater, rating, time) VALUES ($1, $2, $3, now())',
@@ -52,10 +53,12 @@ async function addRating(rater, ratee, rating) {
       const curSum = parseInt(res.rows[0].sumrating);
       const curNumRatings = parseInt(res.rows[0].numratings);
       await client.query(
-         'UPDATE users SET sumrating=$1, numratings=$2',
-         [curSum + rating, curNumRatings + 1]
+         'UPDATE users SET sumrating=$1, numratings=$2 WHERE userid=$3',
+         [curSum + rating, curNumRatings + 1, ratee]
       )
+      await client.query('COMMIT')
    } catch (e) {
+      await client.query('ROLLBACK')
       console.warn(e)
    } finally {
       client.release()
@@ -78,7 +81,7 @@ async function getNumRatings(userid) {
          console.log(`Returning the number of ratings for user ID ${userid}`)
          return parseInt(res.rows[0].numratings);
       }
-      return DEFAULT_RATING
+      return 0 
    } catch (e) {
       console.warn(e)
       await client.query('ROLLBACK')
@@ -103,17 +106,62 @@ async function getRating(userid) {
          console.log(res.rows[0])
          const curSum = parseInt(res.rows[0].sumrating);
          const curNumRatings = parseInt(res.rows[0].numratings);
+         
+         console.log(`getRating ${curSum} / ${curNumRatings} = ${curSum/curNumRatings}`)
          return curSum / curNumRatings;
       }
       return DEFAULT_RATING
    } catch (e) {
       console.warn(e)
-      await client.query('ROLLBACK')
+      return DEFAULT_RATING
    } finally {
       client.release()
    }
 }
 
+async function getLastRatingTime(rater, ratee) {
+   const client = await pool.connect()
+
+   try {
+      const res = await client.query(
+         'SELECT time FROM ratings WHERE rater=$1 AND userid=$2 ORDER BY time DESC LIMIT 1', [rater, ratee]
+      )
+      if (res.rows.length == 0) {
+         return null
+      }
+      return res.rows[0].time
+   } catch (e) {
+      console.warn(e)
+      return null
+   } finally {
+      client.release()
+   }
+}
+
+async function getLeaderboard() {
+   const client = await pool.connect()
+
+   try {
+      const res = await client.query(
+         'SELECT userid, sumrating, numratings FROM users ORDER BY sumrating / numratings DESC LIMIT 5'
+      )
+      return res.rows.map(row => { return {
+         userid: row.userid,
+         rating: parseInt(row.sumrating) / parseInt(row.numratings)
+      }})
+
+      return res.rows
+   } catch (e) {
+      console.warn(e)
+      return null
+   } finally {
+      client.release()
+   }
+}
+
+
 exports.addRating = addRating
 exports.getNumRatings = getNumRatings
 exports.getRating = getRating
+exports.getLastRatingTime = getLastRatingTime
+exports.getLeaderboard = getLeaderboard
