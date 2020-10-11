@@ -65,6 +65,31 @@ async function addRating(rater, ratee, rating) {
    }
 }
 
+// getNumRatings - Returns the number of ratings associated with userid.
+async function getNumRatings(userid) {
+   // Connect to the DB.
+   const client = await pool.connect()
+
+   try {
+      // Get the user's ratings info.
+      const res = await client.query(
+         'SELECT numratings FROM users WHERE userid=$1', [userid]
+      )
+      // If the user is in the DB, calculate the mean and return.
+      // Otherwise, provide the default rating (0).
+      if (res.rowCount !== 0) {
+         console.log(`Returning the number of ratings for user ID ${userid}`)
+         return parseInt(res.rows[0].numratings);
+      }
+      return 0 
+   } catch (e) {
+      console.warn(e)
+      await client.query('ROLLBACK')
+   } finally {
+      client.release()
+   }
+}
+
 // getRating - Calculate the user's current rating.
 async function getRating(userid) {
    // Connect to the DB.
@@ -136,6 +161,7 @@ async function getLeaderboard() {
 
 
 exports.addRating = addRating
+exports.getNumRatings = getNumRatings
 exports.getRating = getRating
 exports.getLastRatingTime = getLastRatingTime
 exports.getLeaderboard = getLeaderboard
