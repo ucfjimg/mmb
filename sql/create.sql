@@ -9,7 +9,7 @@ CREATE TABLE ratings (
   userid TEXT,
   rater TEXT,
   rating NUMERIC,
-  time TIME
+  time TIMESTAMP
 );
 
 CREATE INDEX on ratings(
