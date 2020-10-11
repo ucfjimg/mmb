@@ -1,7 +1,8 @@
 CREATE TABLE users (
    userid TEXT PRIMARY KEY,
    sumRating NUMERIC,
-   numRatings NUMERIC
+   numRatings NUMERIC,
+   numSessionRatings NUMERIC
 );
 
 CREATE TABLE ratings (

@@ -51,8 +51,8 @@ function kickedCard(msg, user, newRating, avgRating, numRatings) {
          title: `A user has been removed.`,
          description: `With ${numRatings} ratings, a recent score of ${newRating},
                        and an average score of ${avgRating.toFixed(2)}, <@!${user}> has been kicked from the server.
-                       Please keep in mind that this is not a ban; they can rejoin if they still have the server link.
-                       However, their score will not be reset if they rejoin.`
+                       \nPlease keep in mind that this is not a ban; they can rejoin if they still have the server link.
+                       \nIf they rejoin, their score will not be reset. However, they will not be removed until they recieved ${MIN_NUMRATINGS_TO_KICK} more ratings.`
       }
    })
 }
@@ -241,12 +241,13 @@ commandHandlers['rate'] = async (msg, args) => {
    // If there are enough ratings, kick the user.
    if(rating < MIN_RATING_TO_KICK && avgRating < MIN_RATING_TO_KICK)
    {
-      const numRatings = await db.getNumRatings(ratee);
+      const numRatings = await db.getNumSessionRatings(ratee);
       if(numRatings >= MIN_NUMRATINGS_TO_KICK)
       {
          // Kick the member associated with the user ID.
          msg.channel.guild.kickMember(ratee, 'Score was below threshold.');
-         return kickedCard(msg, ratee, rating, avgRating, numRatings);
+         db.kickUser(ratee);
+         return kickedCard(msg, ratee, rating, avgRating, await db.getNumRatings(ratee));
       }
    }
 

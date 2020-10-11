@@ -13,8 +13,8 @@ async function ensureUser(userid) {
       )
       if (res.rowCount == 0) {
          await client.query(
-            'INSERT INTO users (userid, sumrating, numratings) VALUES ($1, $2, $3)',
-            [userid, DEFAULT_RATING, DEFAULT_RATING]
+            'INSERT INTO users (userid, sumrating, numratings, numsessionratings) VALUES ($1, $2, $3, $4)',
+            [userid, DEFAULT_RATING, 0, 0]
          )
       }
       client.query('COMMIT')
@@ -45,16 +45,17 @@ async function addRating(rater, ratee, rating) {
 
       // Get the ratee's record. It should be present since ensureUser was called earlier.
       const res = await client.query(
-         'SELECT sumrating, numratings FROM users WHERE userid=$1', [ratee]
+         'SELECT sumrating, numratings, numsessionratings FROM users WHERE userid=$1', [ratee]
       )
 
       // Get the rating sum and number of ratings,
       // then modify them in accordance with the new rating.
       const curSum = parseInt(res.rows[0].sumrating);
       const curNumRatings = parseInt(res.rows[0].numratings);
+      const curNumSessionRatings = parseInt(res.rows[0].numsessionratings);
       await client.query(
-         'UPDATE users SET sumrating=$1, numratings=$2 WHERE userid=$3',
-         [curSum + rating, curNumRatings + 1, ratee]
+         'UPDATE users SET sumrating=$1, numratings=$2, numsessionratings=$3 WHERE userid=$4',
+         [curSum + rating, curNumRatings + 1, curNumSessionRatings + 1, ratee]
       )
       await client.query('COMMIT')
    } catch (e) {
@@ -82,6 +83,31 @@ async function getNumRatings(userid) {
          return parseInt(res.rows[0].numratings);
       }
       return 0 
+   } catch (e) {
+      console.warn(e)
+      await client.query('ROLLBACK')
+   } finally {
+      client.release()
+   }
+}
+
+// getNumSessionRatings - Returns the number of ratings associated with userid's session.
+async function getNumSessionRatings(userid) {
+   // Connect to the DB.
+   const client = await pool.connect()
+
+   try {
+      // Get the user's ratings info.
+      const res = await client.query(
+         'SELECT numsessionratings FROM users WHERE userid=$1', [userid]
+      )
+      // If the user is in the DB, calculate the mean and return.
+      // Otherwise, provide the default rating (0).
+      if (res.rowCount !== 0) {
+         console.log(`Returning the number of session ratings for user ID ${userid}`)
+         return parseInt(res.rows[0].numsessionratings);
+      }
+      return DEFAULT_RATING
    } catch (e) {
       console.warn(e)
       await client.query('ROLLBACK')
@@ -159,9 +185,29 @@ async function getLeaderboard() {
    }
 }
 
+// kickUser - Reset numSessionRatings to zero. When they rejoin the server,
+//            they are safe from kicking until it reaches the threshold again.
+async function kickUser(userid) {
+   // Connect to the DB.
+   const client = await pool.connect()
+
+   try {
+      // Set numsessionratings to 0.
+      const res = await client.query(
+         'UPDATE users SET numsessionratings=0 WHERE userid=$1', [userid]
+      )
+   } catch (e) {
+      console.warn(e)
+      await client.query('ROLLBACK')
+   } finally {
+      client.release()
+   }
+}
 
 exports.addRating = addRating
 exports.getNumRatings = getNumRatings
+exports.getNumSessionRatings = getNumSessionRatings
 exports.getRating = getRating
+exports.kickUser = kickUser
 exports.getLastRatingTime = getLastRatingTime
 exports.getLeaderboard = getLeaderboard
