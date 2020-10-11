@@ -19,6 +19,27 @@ function catUrl(rating) {
    return `http://rodentia.net/mmb${rating}.png`;
 }
 
+// Get the cat emojis if they've been put up
+//
+function catEmoji(msg) {
+   const emojis = []
+
+   for (let i = 0; i <= 5; i++) {
+      const name = `mmbcat${i}`
+
+      const emoji = msg.channel.guild.emojis.filter(e => e.name === name)
+      if (emoji.length === 1) {
+         emojis.push(`<:${name}:${emoji[0].id}>`)
+      }
+   }
+   
+   if (emojis.length == 6) {
+      return emojis
+   }
+
+   return null
+}
+
 // Format a rating 
 // 
 function formatRating(rating) {
@@ -52,7 +73,7 @@ function kickedCard(msg, user, newRating, avgRating, numRatings) {
          description: `With ${numRatings} ratings, a recent score of ${newRating},
                        and an average score of ${avgRating.toFixed(2)}, <@!${user}> has been kicked from the server.
                        \nPlease keep in mind that this is not a ban; they can rejoin if they still have the server link.
-                       \nIf they rejoin, their score will not be reset. However, they will not be removed until they recieved ${MIN_NUMRATINGS_TO_KICK} more ratings.`
+                       \nIf they rejoin, their score will not be reset. However, they will not be removed until they have received ${MIN_NUMRATINGS_TO_KICK} more ratings.`
       }
    })
 }
@@ -92,13 +113,15 @@ function ratingCard(msg, user, rating) {
 // Create a leaderboard card
 //
 function leaderboardCard(msg, leaders) {
+   const cats = catEmoji(msg)
+
    // This should really have the proper cat icon by each place, but
    // fields don't support images other than existing emoji
    //
    const fields = leaders.map((leader, n) => { 
       return { 
          name: n+1, 
-         value: `<@!${leader.userid}> : ${formatRating(parseFloat(leader.rating))}`  
+         value: `${cats ? cats[(Math.round(leader.rating))] : ''}<@!${leader.userid}> : ${formatRating(parseFloat(leader.rating))}`  
       }
    })
 
@@ -179,6 +202,11 @@ function parseUserSnowflake(str) {
    return str;
 }
 
+commandHandlers['mkemoji'] = async(msg, args) => {
+   console.log(msg.channel.guild.id)
+   console.log(msg.channel.guild.roles)
+}
+
 // the help command
 commandHandlers['help'] = async (msg, args) => {
    return helpCard(msg)
@@ -257,6 +285,9 @@ commandHandlers['rate'] = async (msg, args) => {
 // Test connectivity to the bot
 //
 commandHandlers['ping'] = async (msg, args) => {
+   console.log(`guild id ${msg.channel.guild.id}`)
+   console.log(msg.channel.guild.emojis)
+   console.log(catEmoji(msg))
    return msg.channel.createMessage({
       embed: {
          thumbnail: {
